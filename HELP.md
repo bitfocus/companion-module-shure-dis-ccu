@@ -6,7 +6,7 @@ This module will allow you to control a Shure DIS CCU, designed to work with Mic
 * Enter the IP address of the device in the configuration settings.
 * The device will use TCP port 3142.
 
-**Available actions:**
+**Available Actions:**
 * Turn Mic On/Off By Seat Number
 * Turn All Mics Off
 * Turn All Delegate Mics Off
@@ -14,3 +14,12 @@ This module will allow you to control a Shure DIS CCU, designed to work with Mic
 * Set Mic Priority
 * Set Mic Speaker Attenuation
 * Set Mic Attenuation
+
+**Available Variables:**
+* Seat Status (Active or Passive) for every Seat
+* Seat Name for every Seat
+* Mic Status for every Seat
+
+**Available Feedbacks:**
+* Seat Number Mic is On
+* Seat Number Mic is Off
