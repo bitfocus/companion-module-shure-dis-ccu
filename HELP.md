@@ -8,6 +8,7 @@ This module will allow you to control a Shure DIS CCU, designed to work with Mic
 
 **Available Actions:**
 * Turn Mic On/Off By Seat Number
+* Toggle Mic On/Off By Seat Number
 * Turn All Mics Off
 * Turn All Delegate Mics Off
 * Mute/Unmute All Delegate Mics
