@@ -17,7 +17,7 @@ function instance(system, id, config) {
 }
 
 instance.prototype.Variables = [];
-instance.prototype.MicStatus = [];
+instance.prototype.SeatStates = [];
 
 instance.prototype.updateConfig = function(config) {
 	var self = this;
@@ -83,6 +83,8 @@ instance.prototype.init_tcp = function() {
 
 		self.socket.on('receiveline', function(line) {
 			//process each received line for variables and feedback
+			console.log('***COMMAND RECEIVED:***');
+			console.log(line);
 			try {
 				if (line.indexOf('seat_state ') > -1) {
 					let seatNumber = '';
@@ -135,6 +137,28 @@ instance.prototype.init_tcp = function() {
 					self.setVariable('seat_' + seatNumber + '_state', seatState);
 					self.setVariable('seat_' + seatNumber + '_name', seatName);
 
+					let foundSeat = false;
+					for (let i = 0; i < self.SeatStates.length; i++) {
+						if (self.SeatStates[i].seat === seatNumber.toString()) {
+							foundSeat = true;
+							self.SeatStates[i].seatState = seatState;
+							self.SeatStates[i].seatName = seatName;
+							break;
+						}
+					}
+
+					if (!foundSeat) {
+						let seatObj = {};
+						seatObj.seat = seatNumber.toString();
+						seatObj.seatState = seatState;
+						seatObj.seatName = seatName;
+						seatObj.mic = false;
+						seatObj.request = false;
+						self.SeatStates.push(seatObj);
+					}
+
+					self.checkFeedbacks('seat_state');
+
 					self.initPresets();
 				}
 
@@ -167,20 +191,23 @@ instance.prototype.init_tcp = function() {
 
 					self.setVariable('seat_' + seatNumber + '_micstatus', 'On');
 
-					let foundMicNumber = false;
-					for (let i = 0; i < self.MicStatus.length; i++) {
-						if (self.MicStatus[i].seat === seatNumber.toString()) {
-							foundMicNumber = true;
-							self.MicStatus[i].on = true;
+					let foundSeat = false;
+					for (let i = 0; i < self.SeatStates.length; i++) {
+						if (self.SeatStates[i].seat === seatNumber.toString()) {
+							foundSeat = true;
+							self.SeatStates[i].on = true;
 							break;
 						}
 					}
 
-					if (!foundMicNumber) {
-						let micObj = {};
-						micObj.seat = seatNumber.toString();
-						micObj.on = true;
-						self.MicStatus.push(micObj);
+					if (!foundSeat) {
+						let seatObj = {};
+						seatObj.seat = seatNumber.toString();
+						seatObj.seatState = '';
+						seatObj.seatName = '';
+						seatObj.on = true;
+						seatObj.request = false;
+						self.SeatStates.push(seatObj);
 					}
 
 					self.checkFeedbacks('mic');
@@ -215,23 +242,128 @@ instance.prototype.init_tcp = function() {
 
 					self.setVariable('seat_' + seatNumber + '_micstatus', 'Off');
 
-					let foundMicNumber = false;
-					for (let i = 0; i < self.MicStatus.length; i++) {
-						if (self.MicStatus[i].seat.toString() === seatNumber.toString()) {
-							foundMicNumber = true;
-							self.MicStatus[i].on = false;
+					let foundSeat = false;
+					for (let i = 0; i < self.SeatStates.length; i++) {
+						if (self.SeatStates[i].seat === seatNumber.toString()) {
+							foundSeat = true;
+							self.SeatStates[i].on = false;
 							break;
 						}
 					}
 
-					if (!foundMicNumber) {
-						let micObj = {};
-						micObj.seat = seatNumber.toString();
-						micObj.on = false;
-						self.MicStatus.push(micObj);
+					if (!foundSeat) {
+						let seatObj = {};
+						seatObj.seat = seatNumber.toString();
+						seatObj.seatState = '';
+						seatObj.seatName = '';
+						seatObj.on = false;
+						seatObj.request = false;
+						self.SeatStates.push(seatObj);
 					}
 
 					self.checkFeedbacks('mic');
+				}
+
+				if (line.indexOf('mic_request_on ') > -1) {
+					line = line.replace('mic_request_on ', '');
+
+					let seatNumber = '';
+					if (line.indexOf(' ') > -1) {
+						seatNumber = line.substring(0, line.indexOf(' '));
+					}
+					else {
+						seatNumber = line.replace('\r','').replace('\n','');
+					}
+
+					let foundSeatMicStatusVariable = false;
+					for (let i = 0; i < self.Variables.length; i++) {
+						if (self.Variables[i].name === 'seat_' + seatNumber + '_micrequest') {
+							foundSeatMicStatusVariable = true;
+							break;
+						}
+					}
+
+					if (!foundSeatMicStatusVariable) {
+						let variableObj = {};
+						variableObj.name = 'seat_' + seatNumber + '_micrequest';
+						variableObj.label = 'Seat ' + seatNumber + ' Mic Request';
+						self.Variables.push(variableObj);
+						self.setVariableDefinitions(self.Variables);
+					}
+
+					self.setVariable('seat_' + seatNumber + '_micrequest', 'On');
+
+					let foundSeat = false;
+					for (let i = 0; i < self.SeatStates.length; i++) {
+						if (self.SeatStates[i].seat.toString() === seatNumber.toString()) {
+							foundSeat = true;
+							self.SeatStates[i].request = true;
+							break;
+						}
+					}
+
+					if (!foundSeat) {
+						let seatObj = {};
+						seatObj.seat = seatNumber.toString();
+						seatObj.seatState = '';
+						seatObj.seatName = '';
+						seatObj.mic = false;
+						seatObj.request = true;
+						self.SeatStates.push(seatObj);
+					}
+
+					self.checkFeedbacks('mic_request');
+				}
+
+				if (line.indexOf('mic_request_off ') > -1) {
+					line = line.replace('mic_request_off ', '');
+
+					let seatNumber = '';
+					if (line.indexOf(' ') > -1) {
+						seatNumber = line.substring(0, line.indexOf(' '));
+					}
+					else {
+						seatNumber = line.replace('\r','').replace('\n','');
+					}
+
+					let foundSeatMicStatusVariable = false;
+					for (let i = 0; i < self.Variables.length; i++) {
+						if (self.Variables[i].name === 'seat_' + seatNumber + '_micrequest') {
+							foundSeatMicStatusVariable = true;
+							break;
+						}
+					}
+
+					if (!foundSeatMicStatusVariable) {
+						let variableObj = {};
+						variableObj.name = 'seat_' + seatNumber + '_micrequest';
+						variableObj.label = 'Seat ' + seatNumber + ' Mic Request';
+						self.Variables.push(variableObj);
+						self.setVariableDefinitions(self.Variables);
+					}
+
+					self.setVariable('seat_' + seatNumber + '_micrequest', 'Off');
+
+					let foundSeat = false;
+					for (let i = 0; i < self.SeatStates.length; i++) {
+						if (self.SeatStates[i].seat.toString() === seatNumber.toString()) {
+							foundSeat = true;
+							self.SeatStates[i].request = false;
+							break;
+						}
+					}
+
+					if (!foundSeat) {
+						let seatObj = {};
+						seatObj.seat = seatNumber.toString();
+						seatObj.seatState = '';
+						seatObj.seatName = '';
+						seatObj.mic = false;
+						seatObj.request = false;
+						self.SeatStates.push(seatObj);
+					}
+
+					self.checkFeedbacks('mic_request');
 				}
 
 				if (line.indexOf('command_error ') > -1) {
@@ -255,9 +387,9 @@ instance.prototype.initFeedbacks = function () {
 	// feedbacks
 	var feedbacks = {};
 
-	feedbacks['mic'] = {
-		label: 'Change Button Color If Mic is On Or Off',
-		description: 'If selected Seat Number\'s Mic is On or Off, set the button to this color.',
+	feedbacks['seat_state'] = {
+		label: 'Change Button Color If Seat State Is Active Or Passive',
+		description: 'If selected Seat Number\'s Mic is Active Or Passive, set the button to this color.',
 		options: [
 			{
 				type: 'number',
@@ -266,32 +398,92 @@ instance.prototype.initFeedbacks = function () {
 				tooltip: 'The seat number to monitor (between 1 and 65535)',
 				min: 1,
 				max: 65535,
-				default: 50,
+				default: 1,
 				required: true,
 				range: false
 			},
 			{
 				type: 'colorpicker',
-				label: 'Foreground Color For On',
-				id: 'fg_on',
+				label: 'Foreground Color For Active',
+				id: 'fg_active',
 				default: self.rgb(255,255,255)
 			},
 			{
 				type: 'colorpicker',
-				label: 'Background Color For On',
-				id: 'bg_on',
-				default: self.rgb(0,255,0)
+				label: 'Background Color For Active',
+				id: 'bg_active',
+				default: self.rgb(87, 87, 87)
 			},
 			{
 				type: 'colorpicker',
-				label: 'Foreground Color For Off',
-				id: 'fg_off',
+				label: 'Foreground Color For Passive',
+				id: 'fg_passive',
+				default: self.rgb(0,0,0)
+			},
+			{
+				type: 'colorpicker',
+				label: 'Background Color For Passive',
+				id: 'bg_passive',
+				default: self.rgb(102, 0, 102)
+			}
+		]
+	};
+
+	feedbacks['mic_request'] = {
+		label: 'Change Button Color If Mic is Requested',
+		description: 'If selected Seat Number\'s Mic is Requested, set the button to this color.',
+		options: [
+			{
+				type: 'number',
+				label: 'Seat Number',
+				id: 'seat',
+				tooltip: 'The seat number to monitor (between 1 and 65535)',
+				min: 1,
+				max: 65535,
+				default: 1,
+				required: true,
+				range: false
+			},
+			{
+				type: 'colorpicker',
+				label: 'Foreground Color',
+				id: 'fg',
+				default: self.rgb(0,0,0)
+			},
+			{
+				type: 'colorpicker',
+				label: 'Background Color',
+				id: 'bg',
+				default: self.rgb(255,255,255)
+			}
+		]
+	};
+
+	feedbacks['mic'] = {
+		label: 'Change Button Color If Mic is On',
+		description: 'If selected Seat Number\'s Mic is On, set the button to this color.',
+		options: [
+			{
+				type: 'number',
+				label: 'Seat Number',
+				id: 'seat',
+				tooltip: 'The seat number to monitor (between 1 and 65535)',
+				min: 1,
+				max: 65535,
+				default: 1,
+				required: true,
+				range: false
+			},
+			{
+				type: 'colorpicker',
+				label: 'Foreground Color',
+				id: 'fg',
 				default: self.rgb(255,255,255)
 			},
 			{
 				type: 'colorpicker',
-				label: 'Background Color For Off',
-				id: 'bg_off',
+				label: 'Background Color',
+				id: 'bg',
 				default: self.rgb(255,0,0)
 			}
 		]
@@ -302,15 +494,35 @@ instance.prototype.initFeedbacks = function () {
 
 instance.prototype.feedback = function(feedback, bank) {
 	var self = this;
-	
-	if (feedback.type === 'mic') {
-		for (let i = 0; i < self.MicStatus.length; i++) {
-			if (self.MicStatus[i].seat === feedback.options.seat.toString()) {
-				if (self.MicStatus[i].on) {
-					return { color: feedback.options.fg_on, bgcolor: feedback.options.bg_on };
+
+	if (feedback.type === 'seat_state') {
+		for (let i = 0; i < self.SeatStates.length; i++) {
+			if (self.SeatStates[i].seat === feedback.options.seat.toString()) {
+				if (self.SeatStates[i].seatState === 'active') {
+					return { color: feedback.options.fg_active, bgcolor: feedback.options.bg_active };
 				}
 				else {
-					return { color: feedback.options.fg_off, bgcolor: feedback.options.bg_off };
+					return { color: feedback.options.fg_passive, bgcolor: feedback.options.bg_passive };
+				}
+			}
+		}
+	}
+	
+	if (feedback.type === 'mic') {
+		for (let i = 0; i < self.SeatStates.length; i++) {
+			if (self.SeatStates[i].seat === feedback.options.seat.toString()) {
+				if (self.SeatStates[i].on) {
+					return { color: feedback.options.fg, bgcolor: feedback.options.bg };
+				}
+			}
+		}
+	}
+
+	if (feedback.type === 'mic_request') {
+		for (let i = 0; i < self.SeatStates.length; i++) {
+			if (self.SeatStates[i].seat === feedback.options.seat.toString()) {
+				if (self.SeatStates[i].request) {
+					return { color: feedback.options.fg, bgcolor: feedback.options.bg };
 				}
 			}
 		}
@@ -329,7 +541,7 @@ instance.prototype.initPresets = function () {
 			label: 'Seat ' + i,
 			bank: {
 				style: 'text',
-				text: `$(dis-ccu:seat_${i}_name)`,
+				text: `${i} - $(dis-ccu:seat_${i}_name)`,
 				size: '14',
 				color: '16777215',
 				bgcolor: self.rgb(0, 0, 0)
@@ -342,13 +554,29 @@ instance.prototype.initPresets = function () {
 			}],
 			feedbacks: [
 				{
+					type: 'seat_state',
+					options: {
+						seat: i,
+						bg_active: self.rgb(87, 87, 87),
+						fg_active: self.rgb(255, 255, 255),
+						bg_passive: self.rgb(102, 0, 102),
+						fg_passive: self.rgb(0, 0, 0)
+					}
+				},
+				{
+					type: 'mic_request',
+					options: {
+						seat: i,
+						bg: self.rgb(0, 255, 0),
+						fg: self.rgb(0, 0, 0)
+					}
+				},
+				{
 					type: 'mic',
 					options: {
 						seat: i,
-						bg_on: self.rgb(0, 255, 0),
-						fg_on: self.rgb(255, 255, 255),
-						bg_off: self.rgb(255, 0, 0),
-						fg_off: self.rgb(255, 255, 255)
+						bg: self.rgb(255, 0, 0),
+						fg: self.rgb(255, 255, 255)
 					}
 				}
 			]
@@ -407,7 +635,7 @@ instance.prototype.actions = function() {
 					tooltip: 'The seat number to control (between 1 and 65535)',
 					min: 1,
 					max: 65535,
-					default: 50,
+					default: 1,
 					required: true,
 					range: false
 				}
@@ -423,7 +651,7 @@ instance.prototype.actions = function() {
 					tooltip: 'The seat number to control (between 1 and 65535)',
 					min: 1,
 					max: 65535,
-					default: 50,
+					default: 1,
 					required: true,
 					range: false
 				}
@@ -439,7 +667,39 @@ instance.prototype.actions = function() {
 					tooltip: 'The seat number to control (between 1 and 65535)',
 					min: 1,
 					max: 65535,
-					default: 50,
+					default:1,
+					required: true,
+					range: false
+				}
+			]
+		},
+		'mic_request_on': {
+			label: 'Request Mic On By Seat Number',
+			options: [
+				{
+					type: 'number',
+					label: 'Seat Number',
+					id: 'seat',
+					tooltip: 'The seat number to control (between 1 and 65535)',
+					min: 1,
+					max: 65535,
+					default: 1,
+					required: true,
+					range: false
+				}
+			]
+		},
+		'mic_request_off': {
+			label: 'Request Mic Off By Seat Number',
+			options: [
+				{
+					type: 'number',
+					label: 'Seat Number',
+					id: 'seat',
+					tooltip: 'The seat number to control (between 1 and 65535)',
+					min: 1,
+					max: 65535,
+					default: 1,
 					required: true,
 					range: false
 				}
@@ -467,7 +727,7 @@ instance.prototype.actions = function() {
 					tooltip: 'The seat number to control (between 1 and 65535)',
 					min: 1,
 					max: 65535,
-					default: 50,
+					default: 1,
 					required: true,
 					range: false
 				},
@@ -497,7 +757,7 @@ instance.prototype.actions = function() {
 					tooltip: 'The seat number to control (between 1 and 65535)',
 					min: 1,
 					max: 65535,
-					default: 50,
+					default: 1,
 					required: true,
 					range: false
 				},
@@ -529,7 +789,7 @@ instance.prototype.actions = function() {
 					tooltip: 'The seat number to control (between 1 and 65535)',
 					min: 1,
 					max: 65535,
-					default: 50,
+					default: 1,
 					required: true,
 					range: false
 				},
@@ -568,9 +828,9 @@ instance.prototype.action = function(action) {
 			break;
 		case 'mic_toggle':
 			cmd = 'mic_on ' + options.seat;
-			for (let i = 0; i < self.MicStatus.length; i++) {
-				if (self.MicStatus[i].seat === options.seat.toString()) {
-					if (self.MicStatus[i].on) {
+			for (let i = 0; i < self.SeatStates.length; i++) {
+				if (self.SeatStates[i].seat === options.seat.toString()) {
+					if (self.SeatStates[i].on) {
 						cmd = 'mic_off ' + options.seat;
 					}
 					else {
@@ -579,6 +839,12 @@ instance.prototype.action = function(action) {
 					
 				}
 			}
+			break;
+		case 'mic_request_on':
+			cmd = 'mic_request_on ' + options.seat;
+			break;
+		case 'mic_request_off':
+			cmd = 'mic_request_off ' + options.seat;
 			break;
 		case 'mic_all_off':
 			cmd = 'mic_all_off';
@@ -605,6 +871,8 @@ instance.prototype.action = function(action) {
 
 	if (cmd !== undefined) {
 		if (self.socket !== undefined && self.socket.connected) {
+			console.log('***SENDING***');
+			console.log(cmd);
 			self.socket.send(cmd + '\r\n');
 		} else {
 			debug('Socket not connected :(');

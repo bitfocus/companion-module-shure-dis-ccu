@@ -1,6 +1,6 @@
 {
 	"name": "shure-dis-ccu",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"api_version": "1.0.0",
 	"keywords": [ "Microphone", "Audio" ],
 	"manufacturer": "Shure",
