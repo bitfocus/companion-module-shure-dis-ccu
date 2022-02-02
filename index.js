@@ -623,7 +623,7 @@ instance.prototype.destroy = function() {
 instance.prototype.actions = function() {
 	var self = this;
 
-	self.system.emit('instance_actions', self.id, {
+	self.setActions({
 
 		'mic_on': {
 			label: 'Turn Mic On By Seat Number',
